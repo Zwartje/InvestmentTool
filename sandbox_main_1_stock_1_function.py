@@ -18,11 +18,15 @@ stock_price_history_close = pd.DataFrame(data=stock_price_history['Close'], inde
 
 # obtain local extremes
 local_extreme_window = int(config['local_extreme']['historical_window'])
+ticker_name
 test = local_extreme.obtain_historical_window(stock_price_history_close, local_extreme_window)
 local_minimum = local_extreme.find_local_minimum(stock_price_history_close, local_extreme_window)
 local_maximum = local_extreme.find_local_maximum(stock_price_history_close, local_extreme_window)
-local_extremes = [local_minimum, local_maximum]
 plt.plot(stock_price_history['Close'])
 plt.plot(local_minimum)
 plt.plot(local_maximum)
+plt.legend(["historical", "local minimum, window: " + str(local_extreme_window), "local maximum, window: " +
+            str(local_extreme_window)], loc="upper left")
+plt.title(ticker_name)
 plt.show(block=False)
+
