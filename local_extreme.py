@@ -1,6 +1,8 @@
 import numpy as np
+import pandas as pd
 
-def obtain_historical_window(stock_price_history_close, window_in_days):
+
+def obtain_historical_window(stock_price_history_close, window_in_days, price_type):
     """
     this function generates the data frame that rolls the historical price backward and forward by the number of window.
     An illustration is given as below with price column represented by column :math:`t`, and window_in_days is 2:
@@ -30,10 +32,11 @@ def obtain_historical_window(stock_price_history_close, window_in_days):
 
     :param stock_price_history_close: the price of interest to find the local extremes.
     :param window_in_days: the 2-sided horizon length
+    :param price_type: the price type
     :return: returns a dataframe with the historical price and its rolling window as above
     """
     number_of_dates = len(stock_price_history_close)
-    stock_price_window = stock_price_history_close.rename(columns={"Close": "t"}, errors="raise")
+    stock_price_window = stock_price_history_close.rename(columns={price_type: "t"}, errors="raise")
     if window_in_days < number_of_dates:
         for i in range(-window_in_days, window_in_days + 1):
             if i < 0:
@@ -53,7 +56,7 @@ def obtain_historical_window(stock_price_history_close, window_in_days):
     return stock_price_window
 
 
-def find_local_minimum(price, window_in_days):
+def find_local_minimum(price, window_in_days, price_type):
     """
     This type of local minimum is motivated from the very basic way of defining local extremes by visual inspection.
     Given a horizon H, at any time t, one can look for the local min as the minimum within the time interval [t-H, t+H]:
@@ -88,15 +91,17 @@ def find_local_minimum(price, window_in_days):
 
     :param price: the price of interest to find the local extremes.
     :param window_in_days: the 2-sided horizon length
+    :param price_type: the price type
     :return: pl_min: the location (i.e. date & price) of the plain local minimums.
     """
 
-    historical_price_window = obtain_historical_window(price, window_in_days)
+    historical_price_window = obtain_historical_window(price, window_in_days, price_type)
     local_minimum = historical_price_window.min(axis=1)
+
     return local_minimum
 
 
-def find_local_maximum(price, window_in_days):
+def find_local_maximum(price, window_in_days, price_type):
     """
     This type of local maximum is motivated from the very basic way of defining local extremes by visual inspection.
     Given a horizon H, at any time t, one can look for the local max as the maximum within the time interval [t-H, t+H]:
@@ -131,11 +136,36 @@ def find_local_maximum(price, window_in_days):
 
     :param price: the price of interest to find the local extremes.
     :param window_in_days: the 2-sided horizon length
+    :param price_type: the price type
     :return: local_max: the location (i.e. date & price) of the plain local maximums.
     """
 
-    historical_price_window = obtain_historical_window(price, window_in_days)
+    historical_price_window = obtain_historical_window(price, window_in_days, price_type)
     local_maximum = historical_price_window.max(axis=1)
     return local_maximum
 
+
+def calculate_return_between_nearest_local_minimum_and_maximum(stock_price_history_close, local_minimum, local_maximum,
+                                                               price_type):
+    is_local_minimum = (stock_price_history_close[price_type] == local_minimum)
+    is_local_maximum = (stock_price_history_close[price_type] == local_maximum)
+    is_local_extreme = is_local_minimum | is_local_maximum
+
+    extreme_summary = pd.DataFrame(data=stock_price_history_close[price_type])
+    extreme_summary['local_minimum'] = local_minimum
+    extreme_summary['local_maximum'] = local_maximum
+    extreme_summary['is_local_minimum'] = is_local_minimum
+    extreme_summary['is_local_maximum'] = is_local_maximum
+    extreme_summary['is_local_extreme'] = is_local_extreme
+    extreme_summary = extreme_summary[extreme_summary['is_local_extreme']]
+    number_of_dates = len(extreme_summary)
+    extreme_summary['is_local_minimum_previous'] = extreme_summary['is_local_minimum'].shift(1)
+    extreme_summary['is_not_duplicate'] = (
+                extreme_summary['is_local_minimum'] != extreme_summary['is_local_minimum_previous'])
+    extreme_summary = extreme_summary[extreme_summary['is_not_duplicate']]
+    extreme_summary['extreme_return'] = extreme_summary[price_type].pct_change()
+    extreme_summary.loc[extreme_summary['is_local_minimum'] == True, 'extreme_return_type'] = 'loss'
+    extreme_summary.loc[extreme_summary['is_local_maximum'] == True, 'extreme_return_type'] = 'gain'
+    extreme_summary['number_of_days'] = extreme_summary.index.to_series().diff().dt.days
+    return extreme_summary
 
