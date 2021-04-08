@@ -147,6 +147,43 @@ def find_local_maximum(price, window_in_days, price_type):
 
 def calculate_return_between_nearest_local_minimum_and_maximum(stock_price_history_close, local_minimum, local_maximum,
                                                                price_type):
+    """
+    The return can be catogorized into 2 types: a loss (local maximum->local minimum) and a gain (local minimum->local
+    maximum).
+
+    The uniqueness of local maximum and minimum is required, i.e. there shouldn't be more than 1 local minimum
+    between 2 local maximum.
+
+    The implementation is summarized as below:
+
+    +------------+-------+------------+------------+-------------+--------+----------------+
+    | date       | Close | is_minimum | is_maximum | return_type | return | number_of_days |
+    +============+=======+============+============+=============+========+================+
+    | 2020-01-01 | 1     | True       | False      | loss        | Nan    | Nan            |
+    +------------+-------+------------+------------+-------------+--------+----------------+
+    | 2020-01-02 | 2     | False      | True       | gain        | 1      | 1              |
+    +------------+-------+------------+------------+-------------+--------+----------------+
+    | 2020-01-03 | 3     | True       | False      | loss        | 1      | 1              |
+    +------------+-------+------------+------------+-------------+--------+----------------+
+    | 2020-01-04 | 4     | False      | True       | gain        | 1      | 1              |
+    +------------+-------+------------+------------+-------------+--------+----------------+
+    | 2020-01-05 | 5     | True       | False      | loss        | 1      | 1              |
+    +------------+-------+------------+------------+-------------+--------+----------------+
+    | 2020-01-06 | 6     | False      | True       | gain        | 1      | 1              |
+    +------------+-------+------------+------------+-------------+--------+----------------+
+    | 2020-01-07 | 7     | True       | False      | loss        | 1      | 1              |
+    +------------+-------+------------+------------+-------------+--------+----------------+
+    | 2020-01-08 | 8     | False      | True       | gain        | 1      | 1              |
+    +------------+-------+------------+------------+-------------+--------+----------------+
+    | 2020-01-09 | 9     | True       | False      | loss        | 1      | 1              |
+    +------------+-------+------------+------------+-------------+--------+----------------+
+
+    :param stock_price_history_close: the price of interest to find the local extremes.
+    :param local_minimum: local minimum.
+    :param local_maximum: local minimum.
+    :param price_type: price type.
+    :return: return the unique extreme values and the return between 2 nearest extreme values.
+    """
     is_local_minimum = (stock_price_history_close[price_type] == local_minimum)
     is_local_maximum = (stock_price_history_close[price_type] == local_maximum)
     is_local_extreme = is_local_minimum | is_local_maximum

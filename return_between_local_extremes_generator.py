@@ -69,5 +69,3 @@ plt.suptitle(ticker_name + ' momentum return')
 plt.savefig(config['general']['graph_subfolder'] + '\\return_between_2_extremes.png')
 plt.show()
 
-
-
