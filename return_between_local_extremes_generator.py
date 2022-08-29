@@ -25,7 +25,7 @@ economic_folder = os.path.abspath(os.path.join(data_folder, 'economic'))
 ticker_name = config['ticker']['ticker_name']
 price_type = config['parameter']['price_type']
 data_file = os.path.abspath(os.path.join(financial_folder, ticker_name))
-data_df = dp.fun_investing_data_reader(data_file)
+data_df = dp.read_investing_data(data_file)
 stock_ticker = pd.DataFrame(data=data_df[price_type], index=data_df.index)
 start_date = config['parameter']['historical_price_start_date']
 end_date = datetime.today().strftime('%Y-%m-%d')

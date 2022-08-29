@@ -8,7 +8,7 @@ import os
 import pandas as pd
 
 
-def fun_investing_data_reader(file_path):
+def read_investing_data(file_path):
     """
     For the moment the financial data from investing.com are downloaded manually into the data folder.
     :param file_path: the name of the file of interest, with the file extension (e.g. .csv).

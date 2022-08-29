@@ -11,7 +11,7 @@ economic_folder = os.path.abspath(os.path.join(data_folder, 'economic'))
 
 ticker_name = 'US 500 Cash Historical Data.csv'
 data_file = os.path.abspath(os.path.join(financial_folder, ticker_name))
-data_df = dp.fun_investing_data_reader(data_file)
+data_df = dp.read_investing_data(data_file)
 stock_ticker = pd.DataFrame(data=data_df['Price'], index=data_df.index)
 
 stock_ticker['Rolling_min'] = stock_ticker.Price.rolling(window=40, min_periods=20, center=True).min()
