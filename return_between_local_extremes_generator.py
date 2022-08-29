@@ -1,34 +1,48 @@
+import os
 from configparser import ConfigParser, ExtendedInterpolation
-import yfinance as yf
-import matplotlib.pyplot as plt
 from datetime import datetime
-import pandas as pd
+
+import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
-import local_extreme
+import pandas as pd
+
+import data_parser as dp
+import fun_local_extreme
 
 # read configuration
 config = ConfigParser(interpolation=ExtendedInterpolation())
 config.read('configuration.ini')
 
+# folders
+current_folder = os.path.dirname(os.path.realpath(__file__))
+data_folder = os.path.abspath(os.path.join(current_folder, 'data'))
+output_folder = os.path.abspath(os.path.join(current_folder, 'output'))
+financial_folder = os.path.abspath(os.path.join(data_folder, 'financial'))
+economic_folder = os.path.abspath(os.path.join(data_folder, 'economic'))
+
 # obtain the historical stock price
 ticker_name = config['ticker']['ticker_name']
 price_type = config['parameter']['price_type']
-stock_ticker = yf.Ticker(ticker_name)
-stock_price_history = stock_ticker.history(start=config['parameter']['historical_price_start_date'],
-                                           end=datetime.today().strftime('%Y-%m-%d'))
+data_file = os.path.abspath(os.path.join(financial_folder, ticker_name))
+data_df = dp.fun_investing_data_reader(data_file)
+stock_ticker = pd.DataFrame(data=data_df[price_type], index=data_df.index)
+start_date = config['parameter']['historical_price_start_date']
+end_date = datetime.today().strftime('%Y-%m-%d')
+stock_ticker.sort_index(inplace=True)
+stock_price_history = stock_ticker.truncate(before=start_date, after=end_date)
 stock_price_history_close = pd.DataFrame(data=stock_price_history[price_type], index=stock_price_history.index)
 
 # obtain local extremes and its location
 local_extreme_window = int(config['local_extreme']['historical_window'])
-test = local_extreme.obtain_historical_window(stock_price_history_close, local_extreme_window, price_type)
-local_minimum = local_extreme.find_local_minimum(stock_price_history_close, local_extreme_window, price_type)
-local_maximum = local_extreme.find_local_maximum(stock_price_history_close, local_extreme_window, price_type)
-is_local_minimum = (stock_price_history_close[price_type] == local_minimum)
-is_local_maximum = (stock_price_history_close[price_type] == local_maximum)
-extreme_summary = local_extreme.calculate_return_between_nearest_local_minimum_and_maximum(stock_price_history_close,
+test = fun_local_extreme.obtain_historical_window(stock_price_history_close, local_extreme_window)
+local_minimum = fun_local_extreme.find_local_minimum(stock_price_history_close, local_extreme_window)
+local_maximum = fun_local_extreme.find_local_maximum(stock_price_history_close, local_extreme_window)
+is_local_minimum = (stock_price_history_close.iloc[:, 0] == local_minimum)
+is_local_maximum = (stock_price_history_close.iloc[:, 0] == local_maximum)
+extreme_summary = fun_local_extreme.calculate_return_between_nearest_local_minimum_and_maximum(stock_price_history_close,
                                                                                            local_minimum,
-                                                                                           local_maximum,
-                                                                                           price_type)
+                                                                                           local_maximum)
 
 # plot historical price and local extremes
 plot_length = int(config['local_extreme']['plot_length'])
@@ -39,7 +53,12 @@ local_minimum_dates = stock_price_history_close.index[is_local_minimum].tolist()
 local_maximum_dates = stock_price_history_close.index[is_local_maximum].tolist()
 # plt.plot(local_minimum, color='g')
 # plt.plot(local_maximum, color='r')
-plt.plot(stock_price_history['Close'])
+plt.plot(stock_price_history.iloc[:, 0])
+ax = plt.gca()
+ax.xaxis.set_major_locator(matplotlib.dates.YearLocator())
+# ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter('%m-%y'))
+plt.xticks(rotation=45)
+
 plt.legend(["historical", "local minimum, window: " + str(local_extreme_window), "local maximum, window: " +
             str(local_extreme_window)], loc="upper left")
 for extreme_date in local_minimum_dates:
@@ -66,6 +85,5 @@ plt.ylabel('returns between 2 local extremes')
 plt.legend()
 plt.grid(True)
 plt.suptitle(ticker_name + ' momentum return')
-plt.savefig(config['general']['graph_subfolder'] + '\\return_between_2_extremes.png')
+plt.savefig(output_folder + '\\' + ticker_name + '_return_between_2_extremes.png')
 plt.show()
-
