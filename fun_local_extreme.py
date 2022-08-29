@@ -190,7 +190,7 @@ def calculate_return_between_nearest_local_minimum_and_maximum(data_series, loca
 
     :param data_series: the price of interest to find the local extremes.
     :param local_minimum: local minimum.
-    :param local_maximum: local minimum.
+    :param local_maximum: local maximum.
     :return: return the unique extreme values and the return between 2 nearest extreme values.
     """
     is_local_minimum = (data_series.iloc[:, 0] == local_minimum)

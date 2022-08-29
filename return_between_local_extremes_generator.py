@@ -1,14 +1,11 @@
 import os
 from configparser import ConfigParser, ExtendedInterpolation
-from datetime import datetime
-
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 import data_parser as dp
-import fun_local_extreme
 
 # read configuration
 config = ConfigParser(interpolation=ExtendedInterpolation())
@@ -26,37 +23,49 @@ ticker_name = config['ticker']['ticker_name']
 price_type = config['parameter']['price_type']
 data_file = os.path.abspath(os.path.join(financial_folder, ticker_name))
 data_df = dp.read_investing_data(data_file)
-stock_ticker = pd.DataFrame(data=data_df[price_type], index=data_df.index)
-start_date = config['parameter']['historical_price_start_date']
-end_date = datetime.today().strftime('%Y-%m-%d')
-stock_ticker.sort_index(inplace=True)
-stock_price_history = stock_ticker.truncate(before=start_date, after=end_date)
-stock_price_history_close = pd.DataFrame(data=stock_price_history[price_type], index=stock_price_history.index)
+extreme_returns = pd.DataFrame(data=data_df[price_type], index=data_df.index)
 
 # obtain local extremes and its location
 local_extreme_window = int(config['local_extreme']['historical_window'])
-test = fun_local_extreme.obtain_historical_window(stock_price_history_close, local_extreme_window)
-local_minimum = fun_local_extreme.find_local_minimum(stock_price_history_close, local_extreme_window)
-local_maximum = fun_local_extreme.find_local_maximum(stock_price_history_close, local_extreme_window)
-is_local_minimum = (stock_price_history_close.iloc[:, 0] == local_minimum)
-is_local_maximum = (stock_price_history_close.iloc[:, 0] == local_maximum)
-extreme_summary = fun_local_extreme.calculate_return_between_nearest_local_minimum_and_maximum(stock_price_history_close,
-                                                                                           local_minimum,
-                                                                                           local_maximum)
+extreme_returns['local_minimum'] = extreme_returns.Price.rolling(window=local_extreme_window * 2,
+                                                                 min_periods=local_extreme_window, center=True).min()
+extreme_returns['local_maximum'] = extreme_returns.Price.rolling(window=local_extreme_window * 2,
+                                                                 min_periods=local_extreme_window, center=True).max()
+extreme_returns['is_local_minimum'] = (extreme_returns['local_minimum'] == extreme_returns['Price'])
+extreme_returns['is_local_maximum'] = (extreme_returns['local_maximum'] == extreme_returns['Price'])
+extreme_returns['is_extreme'] = extreme_returns.is_local_minimum | extreme_returns.is_local_maximum
+extreme_summary = extreme_returns[extreme_returns['is_extreme']]
+
+# keep only the unique instance of extreme
+# TODO add local algorithm to find the real extreme when multiple extremes are present
+extreme_summary['is_local_minimum_previous'] = extreme_summary['is_local_minimum'].shift(1)
+extreme_summary['is_local_maximum_previous'] = extreme_summary['is_local_maximum'].shift(1)
+extreme_summary['is_duplicate_minimum'] = (
+        extreme_summary['is_local_minimum'] == extreme_summary['is_local_minimum_previous'])
+extreme_summary['is_duplicate_maximum'] = (
+        extreme_summary['is_local_maximum'] == extreme_summary['is_local_maximum_previous'])
+extreme_summary['is_not_duplicate'] = (~extreme_summary['is_duplicate_minimum']) & \
+                                      (~extreme_summary['is_duplicate_maximum'])
+extreme_summary_unique = extreme_summary[extreme_summary['is_not_duplicate']]
+
+# calculate extreme return
+extreme_summary_unique['extreme_return'] = extreme_summary.iloc[:, 0].pct_change()
+extreme_summary_unique.loc[extreme_summary_unique['is_local_minimum'], 'extreme_return_type'] = 'loss'
+extreme_summary_unique.loc[extreme_summary_unique['is_local_maximum'], 'extreme_return_type'] = 'gain'
+extreme_summary_unique['number_of_days'] = pd.to_datetime(extreme_summary_unique.index).to_series().diff().dt.days
 
 # plot historical price and local extremes
 plot_length = int(config['local_extreme']['plot_length'])
 plot_width = int(config['local_extreme']['plot_width'])
 plt.figure(figsize=(plot_length, plot_width))
 plt.subplot(121)
-local_minimum_dates = stock_price_history_close.index[is_local_minimum].tolist()
-local_maximum_dates = stock_price_history_close.index[is_local_maximum].tolist()
+local_minimum_dates = extreme_summary_unique[extreme_summary_unique['is_local_minimum']].index.tolist()
+local_maximum_dates = extreme_summary_unique[extreme_summary_unique['is_local_maximum']].index.tolist()
 # plt.plot(local_minimum, color='g')
 # plt.plot(local_maximum, color='r')
-plt.plot(stock_price_history.iloc[:, 0])
+plt.plot(extreme_returns.iloc[:, 0])
 ax = plt.gca()
 ax.xaxis.set_major_locator(matplotlib.dates.YearLocator())
-# ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter('%m-%y'))
 plt.xticks(rotation=45)
 
 plt.legend(["historical", "local minimum, window: " + str(local_extreme_window), "local maximum, window: " +
@@ -67,9 +76,10 @@ for extreme_date in local_maximum_dates:
     plt.axvline(x=extreme_date, color='r', linestyle='--')
 plt.xlabel('date')
 plt.ylabel('price')
+
 # create a summary containing a summary of trend
 plt.subplot(122)
-trend_summary = extreme_summary[['number_of_days', 'extreme_return', 'extreme_return_type']].dropna()
+trend_summary = extreme_summary_unique[['number_of_days', 'extreme_return', 'extreme_return_type']].dropna()
 for return_type in trend_summary['extreme_return_type'].unique():
     x_values = trend_summary.loc[trend_summary['extreme_return_type'] == return_type, 'number_of_days']
     y_values = trend_summary.loc[trend_summary['extreme_return_type'] == return_type, 'extreme_return']
